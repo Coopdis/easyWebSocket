@@ -26,6 +26,9 @@ void ICACHE_FLASH_ATTR webSocketInit( void ) {
     webSocketConn.proto.tcp = &webSocketTcp;
     webSocketConn.proto.tcp->local_port = WEB_SOCKET_PORT;
     espconn_regist_connectcb(&webSocketConn, webSocketConnectCb);
+    
+    espconn_set_opt( &webSocketConn, ESPCONN_NODELAY );  // remove nagle for low latency
+    
     sint8 ret = espconn_accept(&webSocketConn);
     if ( ret == 0 )
         webSocketDebug("webSocket server established on port %d\n", WEB_SOCKET_PORT );
