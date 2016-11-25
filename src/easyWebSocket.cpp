@@ -342,7 +342,7 @@ void ICACHE_FLASH_ATTR sendWsMessage(WSConnection *connection,
   os_memcpy(message + 1, &payloadLengthField, payloadLengthFieldLength);
   os_memcpy(message + 1 + payloadLengthFieldLength, payload, strlen(payload));
 
-  // webSocketDebug("%s\n", message);
+  webSocketDebug("message -> %s\n", message);
 
   espconn_sent(connection->connection, (uint8_t *)&message, payloadLength + 1 + payloadLengthFieldLength);
 
