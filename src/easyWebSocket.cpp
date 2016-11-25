@@ -304,7 +304,7 @@ void ICACHE_FLASH_ATTR sendWsMessage(WSConnection *connection,
                                      const char *payload,
                                      uint32_t payloadLength,
                                      uint8_t options) {
-  webSocketDebug("sendWsMessage-->%s<-- payloadLength=%d\n", payload,payloadLength);
+  // webSocketDebug("sendWsMessage-->%s<-- payloadLength=%d\n", payload,payloadLength);
 
   uint8_t payloadLengthField[9];
   uint8_t payloadLengthFieldLength = 0;
@@ -331,8 +331,8 @@ void ICACHE_FLASH_ATTR sendWsMessage(WSConnection *connection,
     payloadLengthFieldLength = 1;
   }
 
-  webSocketDebug("%d %d %d %d %d %d %d %d %d\n", payloadLengthField[0], payloadLengthField[1], payloadLengthField[2], payloadLengthField[3], payloadLengthField[4], payloadLengthField[5], payloadLengthField[6],payloadLengthField[7], payloadLengthField[8] );
-  webSocketDebug("%d\n", payloadLengthFieldLength);
+  // webSocketDebug("%d %d %d %d %d %d %d %d %d\n", payloadLengthField[0], payloadLengthField[1], payloadLengthField[2], payloadLengthField[3], payloadLengthField[4], payloadLengthField[5], payloadLengthField[6],payloadLengthField[7], payloadLengthField[8] );
+  // webSocketDebug("%d\n", payloadLengthFieldLength);
 
   uint64_t maximumPossibleMessageSize = 14 + payloadLength; //14 bytes is the biggest frame header size
   char message[maximumPossibleMessageSize];
@@ -341,7 +341,7 @@ void ICACHE_FLASH_ATTR sendWsMessage(WSConnection *connection,
   os_memcpy(message + 1, &payloadLengthField, payloadLengthFieldLength);
   os_memcpy(message + 1 + payloadLengthFieldLength, payload, strlen(payload));
 
-  webSocketDebug("%s\n", message);
+  // webSocketDebug("%s\n", message);
 
   espconn_sent(connection->connection, (uint8_t *)&message, payloadLength + 1 + payloadLengthFieldLength);
 
