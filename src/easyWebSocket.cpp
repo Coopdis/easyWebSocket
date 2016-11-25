@@ -304,7 +304,8 @@ void ICACHE_FLASH_ATTR sendWsMessage(WSConnection *connection,
                                      const char *payload,
                                      uint32_t payloadLength,
                                      uint8_t options) {
-  // webSocketDebug("sendWsMessage-->%s<-- payloadLength=%d\n", payload,payloadLength);
+
+  webSocketDebug("sendWsMessage-->%s<-- payloadLength=%d\n", payload,payloadLength);
 
   uint8_t payloadLengthField[9];
   uint8_t payloadLengthFieldLength = 0;
