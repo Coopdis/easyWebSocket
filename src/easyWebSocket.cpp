@@ -26,15 +26,15 @@ void ICACHE_FLASH_ATTR webSocketInit( void ) {
     webSocketConn.proto.tcp = &webSocketTcp;
     webSocketConn.proto.tcp->local_port = WEB_SOCKET_PORT;
     espconn_regist_connectcb(&webSocketConn, webSocketConnectCb);
-    
+
     espconn_set_opt( &webSocketConn, ESPCONN_NODELAY );  // remove nagle for low latency
-    
+
     sint8 ret = espconn_accept(&webSocketConn);
     if ( ret == 0 )
         webSocketDebug("webSocket server established on port %d\n", WEB_SOCKET_PORT );
     else
         webSocketDebug("webSocket server on port %d FAILED ret=%d\n", WEB_SOCKET_PORT, ret);
-    
+
     return;
 }
 
@@ -56,7 +56,7 @@ void ICACHE_FLASH_ATTR webSocketConnectCb(void *arg) {
 
     // set time out for this connection in seconds
     espconn_regist_time( connection, 120, 1);
-    
+
   //find an empty slot
   uint8_t slotId = 0;
   while (wsConnections[slotId].connection != NULL && wsConnections[slotId].status != STATUS_CLOSED && slotId < WS_MAXCONN) {
@@ -306,30 +306,72 @@ void ICACHE_FLASH_ATTR sendWsMessage(WSConnection *connection,
                                      uint8_t options) {
   //  webSocketDebug("sendWsMessage-->%s<-- payloadLength=%d\n", payload,payloadLength);
 
-  uint8_t payloadLengthField[9];
-  uint8_t payloadLengthFieldLength = 0;
+  // uint8_t payloadLengthField[9];
+  // uint8_t payloadLengthFieldLength = 0;
+  //
+  // if (payloadLength > ((1 << 16) - 1)) {
+  //   payloadLengthField[0] = 127;
+  //   os_memcpy(payloadLengthField + 1, &payloadLength, sizeof(uint32_t));
+  //   payloadLengthFieldLength = sizeof(uint32_t) + 1;
+  // } else if (payloadLength > ((1 << 8) - 1)) {
+  //   payloadLengthField[0] = 126;
+  //   os_memcpy(payloadLengthField + 1, &payloadLength, sizeof(uint16_t));
+  //   payloadLengthFieldLength = sizeof(uint16_t) + 1;
+  // } else {
+  //   payloadLengthField[0] = payloadLength;
+  //   payloadLengthFieldLength = 1;
+  // }
+  //
+  // uint64_t maximumPossibleMessageSize = 14 + payloadLength; //14 bytes is the biggest frame header size
+  // char message[maximumPossibleMessageSize];
+  // message[0] = FLAG_FIN | options;
+  //
+  // os_memcpy(message + 1, &payloadLengthField, payloadLengthFieldLength);
+  // os_memcpy(message + 1 + payloadLengthFieldLength, payload, strlen(payload));
+  //
+  // espconn_sent(connection->connection, (uint8_t *)&message, payloadLength + 1 + payloadLengthFieldLength);
 
-  if (payloadLength > ((1 << 16) - 1)) {
-    payloadLengthField[0] = 127;
-    os_memcpy(payloadLengthField + 1, &payloadLength, sizeof(uint32_t));
-    payloadLengthFieldLength = sizeof(uint32_t) + 1;
-  } else if (payloadLength > ((1 << 8) - 1)) {
-    payloadLengthField[0] = 126;
-    os_memcpy(payloadLengthField + 1, &payloadLength, sizeof(uint16_t));
-    payloadLengthFieldLength = sizeof(uint16_t) + 1;
-  } else {
-    payloadLengthField[0] = payloadLength;
-    payloadLengthFieldLength = 1;
-  }
+  //////////////
 
-  uint64_t maximumPossibleMessageSize = 14 + payloadLength; //14 bytes is the biggest frame header size
+  uint8_t mask[4];
+  uint32_t size = payloadLength;
+
+  uint64_t maximumPossibleMessageSize = 14 + size; //14 bytes is the biggest frame header size
   char message[maximumPossibleMessageSize];
+
+  // Opcode; final fragment
   message[0] = FLAG_FIN | options;
 
-  os_memcpy(message + 1, &payloadLengthField, payloadLengthFieldLength);
-  os_memcpy(message + 1 + payloadLengthFieldLength, payload, strlen(payload));
+  // NOTE: no support for > 16-bit sized messages
+  int i = 0;
+  if (size > 125) {
+      message[1] = WS_SIZE16 | WS_MASK;
+      message[2] = (uint8_t) (size >> 8);
+      message[3] = (uint8_t) (size & 0xFF);
+      i = 3;
+  } else {
+      message[1] = (uint8_t) size | WS_MASK;
+      i = 1;
+  }
 
-  espconn_sent(connection->connection, (uint8_t *)&message, payloadLength + 1 + payloadLengthFieldLength);
+  mask[0] = random(0, 256);
+  mask[1] = random(0, 256);
+  mask[2] = random(0, 256);
+  mask[3] = random(0, 256);
+
+  message[i+1] = mask[0];
+  message[i+2] = mask[1];
+  message[i+3] = mask[2];
+  message[i+4] = mask[3];
+
+  int payloadSize = 0;
+  for (int j=0; j<size; ++j) {
+      message[i+j+5] = payload[j] ^ mask[j % 4];
+      payloadSize = i+j+5;
+  }
+
+  espconn_sent(connection->connection, (uint8_t *)&message, payloadSize);
+
 }
 
 //***********************************************************************
@@ -359,8 +401,3 @@ void ICACHE_FLASH_ATTR webSocketDisconCb(void *arg) {
 void ICACHE_FLASH_ATTR webSocketReconCb(void *arg, sint8 err) {
   webSocketDebug("In webSocket_server_recon_cb err=%d\n", err );
 }
-
-
-
-
-
