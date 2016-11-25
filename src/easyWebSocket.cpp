@@ -315,7 +315,12 @@ void ICACHE_FLASH_ATTR sendWsMessage(WSConnection *connection,
     payloadLengthFieldLength = sizeof(uint32_t) + 1;
   } else if (payloadLength > 125) { //((1 << 8) - 1)
     payloadLengthField[0] = 126;
-    os_memcpy(payloadLengthField + 1, &payloadLength, sizeof(uint16_t));
+    if (payloadLength > ((1 << 8) - 1)) {
+      os_memcpy(payloadLengthField + 1, &payloadLength, sizeof(uint16_t));
+    } else {
+      payloadLengthField[1] = 0;
+      os_memcpy(payloadLengthField + 2, &payloadLength, sizeof(uint16_t));
+    }
     payloadLengthFieldLength = sizeof(uint16_t) + 1;
   } else {
     payloadLengthField[0] = payloadLength;
