@@ -344,9 +344,10 @@ void ICACHE_FLASH_ATTR sendWsMessage(WSConnection *connection,
 
   // webSocketDebug("message -> %s size -> %d \n", message, payloadLength + 1 + payloadLengthFieldLength);
 
-  while (true) {
+  int i = 0;
+  while (true && i < 5) {
     webSocketDebug("espconn_state -> %d \n", webSocketConn.state);
-    if (webSocketConn.state != ESPCONN_WAIT) { delay(1); } else { break; }
+    if (webSocketConn.state != ESPCONN_WAIT) { delay(1); i++; } else { break; }
   }
 
   int result = espconn_sent(connection->connection, (uint8_t *)&message, payloadLength + 1 + payloadLengthFieldLength);
