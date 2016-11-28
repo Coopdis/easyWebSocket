@@ -305,7 +305,7 @@ void ICACHE_FLASH_ATTR sendWsMessage(WSConnection *connection,
                                      uint32_t payloadLength,
                                      uint8_t options) {
 
-  webSocketDebug("sendWsMessage-->%s<-- payloadLength=%d\n", payload,payloadLength);
+  webSocketDebug("sendWsMessage-->%s<-- payloadLength=%d\n", payload, payloadLength);
 
   uint8_t payloadLengthField[9];
   uint8_t payloadLengthFieldLength = 0;
@@ -343,16 +343,22 @@ void ICACHE_FLASH_ATTR sendWsMessage(WSConnection *connection,
   os_memcpy(message + 1 + payloadLengthFieldLength, payload, strlen(payload));
 
   // webSocketDebug("message -> %s size -> %d \n", message, payloadLength + 1 + payloadLengthFieldLength);
-
   int i = 0;
   while (true && i < 5) {
-    webSocketDebug("espconn_state -> %d \n", webSocketConn.state);
-    if (webSocketConn.state != ESPCONN_WAIT) { delay(1); i++; } else { break; }
+
+    sint8 result = ESPCONN_OK;
+  	result = espconn_sent(connection->connection, (uint8_t *)&message, payloadLength + 1 + payloadLengthFieldLength);
+
+  	if (result != ESPCONN_OK) {
+      webSocketDebug("sendWsMessage: espconn_sent error %d on conn %p\ \n", result, connection);
+      delay(1);
+      webSocketDebug("sendWsMessage: millis: %d\ \n", millis());
+      i++;
+    } else {
+      break;
+    }
+
   }
-
-  int result = espconn_sent(connection->connection, (uint8_t *)&message, payloadLength + 1 + payloadLengthFieldLength);
-
-  webSocketDebug("sendMessageResult -> %d \n", result);
 
   //////////////
 
