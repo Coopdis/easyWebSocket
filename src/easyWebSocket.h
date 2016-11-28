@@ -1,7 +1,7 @@
 // adapted from https://github.com/dangrie158/ESP-8266-WebSocket
 
-#ifndef   _MESH_WEB_SOCKET_H_
-#define   _MESH_WEB_SOCKET_H_
+#ifndef   _EASY_WEB_SOCKET_H_
+#define   _EASY_WEB_SOCKET_H_
 
 #define WEB_SOCKET_PORT   2222
 
@@ -13,6 +13,7 @@
 //we normally dont need that many connection, however a single
 //connection only allocates a WSConnection struct and is therefore really small
 #define WS_MAXCONN 4
+#define MAX_TXBUFFER 1024
 #define CONN_TIMEOUT 60*60*12
 
 /* from IEEE RFC6455 sec 5.2
@@ -82,11 +83,14 @@ struct WSFrame {
 
 struct WSConnection {
   uint8_t status;
-  struct espconn* connection;
   WSOnMessage onMessage;
+  struct espconn* connection;
+  char *txbuffer; //the buffer for the data to send
+  uint16 txbufferlen; //the length of data in txbuffer
+  bool readytosend; //true, if txbuffer can send by espconn_sent
 };
 
-void inline   webSocketDebug( const char* format ... ) {
+void inline webSocketDebug( const char* format ... ) {
     char str[200];
 
     va_list args;
@@ -118,12 +122,15 @@ static void ICACHE_FLASH_ATTR       unmaskWsPayload(char *maskedPayload,
 void                                closeWsConnection(WSConnection* connection);
 
 void                                webSocketSetReceiveCallback( void (*onMessage)(char *paylodData) );
-void                                   webSocketSetConnectionCallback( void (*onConnection)(void) );
+void                                webSocketSetConnectionCallback( void (*onConnection)(void) );
 
 void                                webSocketConnectCb(void *arg);
 void                                webSocketRecvCb(void *arg, char *pusrdata, unsigned short length);
 void                                webSocketSentCb(void *arg);
+void                                webSocketSentWriteFinishCb(void *arg);
 void                                webSocketDisconCb(void *arg);
 void                                webSocketReconCb(void *arg, sint8 err);
 
-#endif //_MESH_WEB_SOCKET_H_
+sint8 ICACHE_FLASH_ATTR             espbuffsent(WSConnection *connection, const char *data, uint16 len);
+
+#endif //_EASY_WEB_SOCKET_H_
