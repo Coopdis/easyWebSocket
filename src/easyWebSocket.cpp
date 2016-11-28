@@ -350,9 +350,9 @@ void ICACHE_FLASH_ATTR sendWsMessage(WSConnection *connection,
   	result = espconn_sent(connection->connection, (uint8_t *)&message, payloadLength + 1 + payloadLengthFieldLength);
 
   	if (result != ESPCONN_OK) {
-      webSocketDebug("sendWsMessage: espconn_sent error %d on conn %p\ \n", result, connection);
+      webSocketDebug("sendWsMessage: espconn_sent error %d on conn %p \n", result, connection);
       delay(1);
-      webSocketDebug("sendWsMessage: millis: %d\ \n", millis());
+      webSocketDebug("sendWsMessage: millis: %d \n", millis());
       i++;
     } else {
       break;
