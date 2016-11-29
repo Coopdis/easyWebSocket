@@ -1,14 +1,13 @@
 {
-  "name": “easyWebSocket”,
-  "keywords": “esp8266 web socket websocket”,
-  "description": “A simple websocket server for esp8266.  Creates and manages websocket connections using the esp8266 openSDK tcp functions.  Interfaces to Arduino (and other) applications through straight forward callbacks.“,
+  "name": "easyWebSocket",
+  "keywords": "esp8266 web socket websocket",
+  "description": "A simple websocket server for esp8266.  Creates and manages websocket connections using the esp8266 openSDK tcp functions.  Interfaces to Arduino (and other) applications through straight forward callbacks.",
   "repository":
   {
     "type": "git",
     "url": "https://github.com/Coopdis/easyWebSocket"
   },
-  "version": “1.0.0”,
-  "frameworks": “*”,
+  "version": "1.0.0",
+  "frameworks": "*",
   "platforms": "esp8266"
 }
-

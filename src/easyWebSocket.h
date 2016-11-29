@@ -1,7 +1,7 @@
 // adapted from https://github.com/dangrie158/ESP-8266-WebSocket
 
-#ifndef   _MESH_WEB_SOCKET_H_
-#define   _MESH_WEB_SOCKET_H_
+#ifndef   _EASY_WEB_SOCKET_H_
+#define   _EASY_WEB_SOCKET_H_
 
 #define WEB_SOCKET_PORT   2222
 
@@ -10,9 +10,10 @@
 #define WS_RESPONSE "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: %s\r\n\r\n"
 #define HTML_HEADER_LINEEND "\r\n"
 
-//we normally dont need that many connection, however a single 
+//we normally dont need that many connection, however a single
 //connection only allocates a WSConnection struct and is therefore really small
 #define WS_MAXCONN 4
+#define MAX_TXBUFFER 1024
 #define CONN_TIMEOUT 60*60*12
 
 /* from IEEE RFC6455 sec 5.2
@@ -48,6 +49,11 @@
 #define OPCODE_PING 0x9
 #define OPCODE_PONG 0xA
 
+#define WS_MASK 0x80
+
+#define WS_SIZE16 126
+#define WS_SIZE64 127
+
 #define FLAGS_MASK ((uint8_t)0xF0)
 #define OPCODE_MASK ((uint8_t)0x0F)
 #define IS_MASKED ((uint8_t)(1<<7))
@@ -77,26 +83,29 @@ struct WSFrame {
 
 struct WSConnection {
   uint8_t status;
-  struct espconn* connection;
   WSOnMessage onMessage;
+  struct espconn* connection;
+  char *txbuffer; //the buffer for the data to send
+  uint16 txbufferlen; //the length of data in txbuffer
+  bool readytosend; //true, if txbuffer can send by espconn_sent
 };
 
-void inline   webSocketDebug( const char* format ... ) {
+void inline webSocketDebug( const char* format ... ) {
     char str[200];
-    
+
     va_list args;
     va_start(args, format);
-    
+
     vsnprintf(str, sizeof(str), format, args);
     Serial.print( str );
     //    broadcastWsMessage(str, strlen(str), OPCODE_TEXT);
-    
+
     va_end(args);
 }
 
 
 void ICACHE_FLASH_ATTR              webSocketInit( void );
-void ICACHE_FLASH_ATTR              sendWsMessage(WSConnection* connection,
+void ICACHE_FLASH_ATTR              sendWsMessage(int slotId,
                                                   const char* payload,
                                                   uint32_t payloadLength,
                                                   uint8_t options);
@@ -104,21 +113,24 @@ void ICACHE_FLASH_ATTR              broadcastWsMessage(const char* payload,
                                                        uint32_t payloadLength,
                                                        uint8_t options);
 uint16_t ICACHE_FLASH_ATTR          countWsConnections( void );
-WSConnection *ICACHE_FLASH_ATTR     getWsConnection(struct espconn *connection);
+int ICACHE_FLASH_ATTR               getWsConnection(struct espconn *connection);
 static int ICACHE_FLASH_ATTR        createWsAcceptKey(const char *key, char *buffer, int bufferSize);
 static void ICACHE_FLASH_ATTR       parseWsFrame(char *data, WSFrame *frame);
 static void ICACHE_FLASH_ATTR       unmaskWsPayload(char *maskedPayload,
                                                     uint32_t payloadLength,
                                                     uint32_t maskingKey);
-void                                closeWsConnection(WSConnection* connection);
+void                                closeWsConnection(int slotId);
 
 void                                webSocketSetReceiveCallback( void (*onMessage)(char *paylodData) );
-void                                   webSocketSetConnectionCallback( void (*onConnection)(void) );
+void                                webSocketSetConnectionCallback( void (*onConnection)(void) );
 
 void                                webSocketConnectCb(void *arg);
 void                                webSocketRecvCb(void *arg, char *pusrdata, unsigned short length);
 void                                webSocketSentCb(void *arg);
+void                                webSocketSentWriteFinishCb(void *arg);
 void                                webSocketDisconCb(void *arg);
 void                                webSocketReconCb(void *arg, sint8 err);
 
-#endif //_MESH_WEB_SOCKET_H_
+sint8 ICACHE_FLASH_ATTR             espbuffsent(int slotId, const char *data, uint16 len);
+
+#endif //_EASY_WEB_SOCKET_H_
