@@ -106,8 +106,8 @@ void ICACHE_FLASH_ATTR webSocketRecvCb(void *arg, char *data, unsigned short len
   //webSocketDebug("In webSocketRecvCb\n");
   //  webSocketDebug("webSocket recv--->%s<----\n", data);
 
-  WSConnection *wsConnection = getWsConnection(esp_connection);
-  if (wsConnection == NULL) {
+  int slotId = getWsConnection(esp_connection);
+  if (wsConnections[slotId].connection == NULL) {
     webSocketDebug("webSocket Heh?\n");
     return;
   }
@@ -148,7 +148,7 @@ void ICACHE_FLASH_ATTR webSocketRecvCb(void *arg, char *data, unsigned short len
 
       //send the response
       espconn_sent(esp_connection, (uint8_t *)responseMessage, strlen(responseMessage));
-      wsConnection->status = STATUS_OPEN;
+      wsConnections[slotId].status = STATUS_OPEN;
 
       //call the connection callback
       if (wsOnConnectionCallback != NULL) {
@@ -169,7 +169,7 @@ void ICACHE_FLASH_ATTR webSocketRecvCb(void *arg, char *data, unsigned short len
       //we are the server, and need to shut down the connection
       //if we receive an unmasked packet
       //      webSocketDebug("frame.isMasked=false closing connection\n");
-      closeWsConnection(wsConnection);
+      closeWsConnection(slotId);
       return;
     }
 
@@ -177,19 +177,19 @@ void ICACHE_FLASH_ATTR webSocketRecvCb(void *arg, char *data, unsigned short len
 
     if (frame.opcode == OPCODE_PING) {
       //      webSocketDebug("frame.opcode=OPCODE_PING\n");
-      sendWsMessage(wsConnection, frame.payloadData, frame.payloadLength, FLAG_FIN | OPCODE_PONG);
+      sendWsMessage(slotId, frame.payloadData, frame.payloadLength, FLAG_FIN | OPCODE_PONG);
       return;
     }
 
     if (frame.opcode == OPCODE_CLOSE) {
       //gracefully shut down the connection
       //      webSocketDebug("frame.opcode=OPCODE_CLOSE, closeing connection\n");
-      closeWsConnection(wsConnection);
+      closeWsConnection(slotId);
       return;
     }
 
-    if (wsConnection->onMessage != NULL) {
-      wsConnection->onMessage(frame.payloadData);
+    if (wsConnections[slotId].onMessage != NULL) {
+      wsConnections[slotId].onMessage(frame.payloadData);
     }
   }
   //  webSocketDebug("Leaving webSocketRecvCb\n");
@@ -236,18 +236,19 @@ static void ICACHE_FLASH_ATTR parseWsFrame(char *data, WSFrame *frame) {
 }
 
 //***********************************************************************
-WSConnection *ICACHE_FLASH_ATTR getWsConnection(struct espconn *connection) {
+int ICACHE_FLASH_ATTR getWsConnection(struct espconn *connection) {
   //  webSocketDebug("In getWsConnecition\n");
   for (int slotId = 0; slotId < WS_MAXCONN; slotId++) {
     //    webSocketDebug("slotId=%d, ws.conn*=%x, espconn*=%x<--  ", slotId, wsConnections[slotId].connection, connection);
 
-    //    webSocketDebug("ws.connIP=%d.%d.%d.%d espconnIP=%d.%d.%d.%d --- ", IP2STR( wsConnections[slotId].connection->proto.tcp->remote_ip), IP2STR( connection->proto.tcp->remote_ip) );
-    //    webSocketDebug("ws.connIP=%x espconnIP=%x\n", *(uint32_t*)wsConnections[slotId].connection->proto.tcp->remote_ip, *(uint32_t*)connection->proto.tcp->remote_ip ) ;
+    //    webSocketDebug("ws.connIP=%d.%d.%d.%d espconnIP=%d.%d.%d.%d --- ", IP2STR( wsConnections[slotId].wsConnections[slotId].proto.tcp->remote_ip), IP2STR( wsConnections[slotId].proto.tcp->remote_ip) );
+    //    webSocketDebug("ws.connIP=%x espconnIP=%x\n", *(uint32_t*)wsConnections[slotId].wsConnections[slotId].proto.tcp->remote_ip, *(uint32_t*)wsConnections[slotId].proto.tcp->remote_ip ) ;
 
     //   if (wsConnections[slotId].connection == connection) {
     if (*(uint32_t*)wsConnections[slotId].connection->proto.tcp->remote_ip == *(uint32_t*)connection->proto.tcp->remote_ip ) {
       //     webSocketDebug("Leaving getWsConnecition slotID=%d\n", slotId);
-      return wsConnections + slotId;
+    //   return wsConnections + slotId;
+    return slotId;
     }
   }
 
@@ -274,12 +275,12 @@ static int ICACHE_FLASH_ATTR createWsAcceptKey(const char *key, char *buffer, in
 }
 
 //***********************************************************************
-void ICACHE_FLASH_ATTR closeWsConnection(WSConnection * connection) {
+void ICACHE_FLASH_ATTR closeWsConnection(int slotId) {
   //  webSocketDebug("In closeWsConnection\n");
 
   char closeMessage[CLOSE_MESSAGE_LENGTH] = CLOSE_MESSAGE;
-  espconn_sent(connection->connection, (uint8_t *)closeMessage, sizeof(closeMessage));
-  connection->status = STATUS_CLOSED;
+  espconn_sent(wsConnections[slotId].connection, (uint8_t *)closeMessage, sizeof(closeMessage));
+  wsConnections[slotId].status = STATUS_CLOSED;
   return;
 }
 
@@ -290,7 +291,7 @@ void ICACHE_FLASH_ATTR broadcastWsMessage(const char *payload, uint32_t payloadL
         WSConnection connection = wsConnections[slotId];
         if (connection.connection != NULL && connection.status == STATUS_OPEN) {
             webSocketDebug("broadcastWsMessage enter with conn: %p and add: %p\n", connection, &connection);
-            sendWsMessage(&connection, payload, payloadLength, options);
+            sendWsMessage(slotId, payload, payloadLength, options);
         }
     }
 }
@@ -308,13 +309,13 @@ uint16_t ICACHE_FLASH_ATTR countWsConnections( void ) {
 }
 
 //***********************************************************************
-void ICACHE_FLASH_ATTR sendWsMessage(WSConnection *connection,
+void ICACHE_FLASH_ATTR sendWsMessage(int slotId,
                                      const char *payload,
                                      uint32_t payloadLength,
                                      uint8_t options) {
 
   webSocketDebug("sendWsMessage-->%s<-- payloadLength=%d \n", payload, payloadLength);
-  webSocketDebug("sendWsMessage-->conn: %p \n", connection);
+  // webSocketDebug("sendWsMessage-->conn: %p \n", connection);
 
   uint8_t payloadLengthField[9];
   uint8_t payloadLengthFieldLength = 0;
@@ -353,11 +354,11 @@ void ICACHE_FLASH_ATTR sendWsMessage(WSConnection *connection,
 
   // Fill up buffer with the data instead of sending it directly
   webSocketDebug("message->%s\n", message);
-  espbuffsent(connection, (const char *)&message, payloadLength + 1 + payloadLengthFieldLength);
+  espbuffsent(slotId, (const char *)&message, payloadLength + 1 + payloadLengthFieldLength);
 
   // sint8 result = ESPCONN_OK;
   // ready_send_data = false;
-  // result = espconn_sent(connection->connection, (uint8_t *)&message, payloadLength + 1 + payloadLengthFieldLength);
+  // result = espconn_sent(wsConnections[slotId].connection, (uint8_t *)&message, payloadLength + 1 + payloadLengthFieldLength);
   // if (result != ESPCONN_OK) {
   //   webSocketDebug("sendWsMessage: espconn_sent error %d on conn %p \n", result, connection);
   //   webSocketDebug("sendWsMessage: millis: %d \n", millis());
@@ -376,33 +377,33 @@ void ICACHE_FLASH_ATTR sendWsMessage(WSConnection *connection,
 }
 
 //***********************************************************************
-static sint8 ICACHE_FLASH_ATTR sendtxbuffer(WSConnection *connection) {
-  webSocketDebug("sendtxbuffer: conn: %p and readytosend %d\n", connection, connection->readytosend);
+static sint8 ICACHE_FLASH_ATTR sendtxbuffer(int slotId) {
+  // webSocketDebug("sendtxbuffer: conn: %p and readytosend %d\n", connection, wsConnections[slotId].readytosend);
 	sint8 result = ESPCONN_OK;
-	if (connection->txbufferlen != 0) {
-		connection->readytosend = false;
-		result = espconn_sent(connection->connection, (uint8_t*)connection->txbuffer, connection->txbufferlen);
-		connection->txbufferlen = 0;
+	if (wsConnections[slotId].txbufferlen != 0) {
+		wsConnections[slotId].readytosend = false;
+		result = espconn_sent((espconn*)wsConnections[slotId].connection, (uint8_t*)wsConnections[slotId].txbuffer, wsConnections[slotId].txbufferlen);
+		wsConnections[slotId].txbufferlen = 0;
 		if (result != ESPCONN_OK) {
-      webSocketDebug("sendtxbuffer: espconn_sent error %d on conn %p\n", result, connection);
+    //   webSocketDebug("sendtxbuffer: espconn_sent error %d on conn %p\n", result, connection);
     }
 	}
 	return result;
 }
 
-sint8 ICACHE_FLASH_ATTR espbuffsent(WSConnection *connection, const char *data, uint16 len) {
-  webSocketDebug("espbuffsent: enter with conn %p\n", connection);
+sint8 ICACHE_FLASH_ATTR espbuffsent(int slotId, const char *data, uint16 len) {
+  // webSocketDebug("espbuffsent: enter with conn %p\n", connection);
 
-	if (connection->txbufferlen + len > MAX_TXBUFFER) {
-		webSocketDebug("espbuffsent: txbuffer full on conn %p\n", connection);
+	if (wsConnections[slotId].txbufferlen + len > MAX_TXBUFFER) {
+		// webSocketDebug("espbuffsent: txbuffer full on conn %p\n", connection);
 		return -128;
 	}
 
-	os_memcpy(connection->txbuffer + connection->txbufferlen, data, len);
-	connection->txbufferlen += len;
-  webSocketDebug("espbuffsent: txbufferlen update success with readytosend %d\n", connection->readytosend);
-	if (connection->readytosend) {
-		return sendtxbuffer(connection);
+	os_memcpy(wsConnections[slotId].txbuffer + wsConnections[slotId].txbufferlen, data, len);
+	wsConnections[slotId].txbufferlen += len;
+  webSocketDebug("espbuffsent: txbufferlen update success with readytosend %d\n", wsConnections[slotId].readytosend);
+	if (wsConnections[slotId].readytosend) {
+		return sendtxbuffer(slotId);
   }
 	return ESPCONN_OK;
 }
@@ -411,22 +412,22 @@ sint8 ICACHE_FLASH_ATTR espbuffsent(WSConnection *connection, const char *data, 
 void ICACHE_FLASH_ATTR webSocketSentCb(void *arg) {
 
   espconn *esp_connection = (espconn*)arg;
-  WSConnection *wsConnection = getWsConnection(esp_connection);
+  int slotId = getWsConnection(esp_connection);
 
-  webSocketDebug("Sent callback on conn %p\n", wsConnection);
+  // webSocketDebug("Sent callback on conn %p\n", wsConnection);
 
-  if(wsConnection == NULL) return;
-  //wsConnection->readytosend = true;
-  wsConnection->readytosend = true;
-  sendtxbuffer(wsConnection);
+  if(wsConnections[slotId].connection == NULL) return;
+  //wswsConnections[slotId].readytosend = true;
+  wsConnections[slotId].readytosend = true;
+  sendtxbuffer(slotId);
 }
 
 /***********************************************************************/
 void ICACHE_FLASH_ATTR webSocketDisconCb(void *arg) {
   espconn *esp_connection = (espconn*)arg;
-  WSConnection *wsConn = getWsConnection(esp_connection);
-  if ( wsConn != NULL ) {
-    wsConn->status = STATUS_CLOSED;
+  int slotId = getWsConnection(esp_connection);
+  if ( wsConnections[slotId].connection != NULL ) {
+    wsConnections[slotId].status = STATUS_CLOSED;
     webSocketDebug("Leaving webSocket_server_discon_cb found\n");
     return;
   }

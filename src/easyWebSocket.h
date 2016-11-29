@@ -105,7 +105,7 @@ void inline webSocketDebug( const char* format ... ) {
 
 
 void ICACHE_FLASH_ATTR              webSocketInit( void );
-void ICACHE_FLASH_ATTR              sendWsMessage(WSConnection* connection,
+void ICACHE_FLASH_ATTR              sendWsMessage(int slotId,
                                                   const char* payload,
                                                   uint32_t payloadLength,
                                                   uint8_t options);
@@ -113,13 +113,13 @@ void ICACHE_FLASH_ATTR              broadcastWsMessage(const char* payload,
                                                        uint32_t payloadLength,
                                                        uint8_t options);
 uint16_t ICACHE_FLASH_ATTR          countWsConnections( void );
-WSConnection *ICACHE_FLASH_ATTR     getWsConnection(struct espconn *connection);
+int ICACHE_FLASH_ATTR               getWsConnection(struct espconn *connection);
 static int ICACHE_FLASH_ATTR        createWsAcceptKey(const char *key, char *buffer, int bufferSize);
 static void ICACHE_FLASH_ATTR       parseWsFrame(char *data, WSFrame *frame);
 static void ICACHE_FLASH_ATTR       unmaskWsPayload(char *maskedPayload,
                                                     uint32_t payloadLength,
                                                     uint32_t maskingKey);
-void                                closeWsConnection(WSConnection* connection);
+void                                closeWsConnection(int slotId);
 
 void                                webSocketSetReceiveCallback( void (*onMessage)(char *paylodData) );
 void                                webSocketSetConnectionCallback( void (*onConnection)(void) );
@@ -131,6 +131,6 @@ void                                webSocketSentWriteFinishCb(void *arg);
 void                                webSocketDisconCb(void *arg);
 void                                webSocketReconCb(void *arg, sint8 err);
 
-sint8 ICACHE_FLASH_ATTR             espbuffsent(WSConnection *connection, const char *data, uint16 len);
+sint8 ICACHE_FLASH_ATTR             espbuffsent(int slotId, const char *data, uint16 len);
 
 #endif //_EASY_WEB_SOCKET_H_
